@@ -68,13 +68,17 @@ function parentOf(path: string): string {
 
 /**
  * Notes made before the identity was kept in frontmatter (or by Agile Task
- * Notes) are recognised by the task id in their name, as a whole word, so
- * "PROJ-1" does not claim "PROJ-12".
+ * Notes) are recognised by name: the name a new note would get, or else the
+ * task id as a whole word, so "PROJ-1" does not claim "PROJ-12". Bare
+ * numbers ("12") are too common in note names, so they need the exact name.
  */
-export function legacyMatch(notes: IndexedNote[], id: string): IndexedNote | undefined {
+export function legacyMatch(notes: IndexedNote[], id: string, name: string): IndexedNote | undefined {
+  const unclaimed = notes.filter((note) => note.id === undefined)
+  const exact = unclaimed.find((note) => note.basename === name)
+  if (exact || /^\d+$/.test(id)) return exact
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const pattern = new RegExp(`(^|[^\\p{L}\\p{N}_-])${escaped}($|[^\\p{L}\\p{N}_-])`, "u")
-  return notes.find((note) => note.id === undefined && pattern.test(note.basename))
+  return unclaimed.find((note) => pattern.test(note.basename))
 }
 
 /** Pulls one source and brings its notes and boards up to date. */
@@ -102,6 +106,7 @@ export async function syncSource(
     for (const task of group.tasks) {
       result.tasks++
       const target = joinPath(groupFolder, task.folder ?? "", group.splitCompleted && task.done ? COMPLETED : "")
+      const name = noteName(source.noteName || settings.noteName, task, meta)
       const identity: Frontmatter = { [SOURCE_KEY]: source.id, [ID_KEY]: task.id }
       const frontmatter = settings.frontmatter ? { ...identity, ...taskFrontmatter(task) } : identity
       let note = byId.get(task.id)
@@ -109,7 +114,7 @@ export async function syncSource(
       if (note) {
         if (settings.frontmatter) await store.stamp(note, frontmatter)
       } else {
-        const legacy = legacyMatch(unstamped, task.id)
+        const legacy = legacyMatch(unstamped, task.id, name)
         if (legacy) {
           await store.stamp(legacy, frontmatter)
           unstamped.splice(unstamped.indexOf(legacy), 1)
@@ -119,7 +124,6 @@ export async function syncSource(
 
       if (!note) {
         await store.ensureFolder(target)
-        const name = noteName(source.noteName || settings.noteName, task, meta)
         const content = noteContent(source.noteTemplate || settings.noteTemplate, task, meta)
         note = await store.create(joinPath(target, `${name}.md`), content, frontmatter)
         result.created++

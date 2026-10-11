@@ -150,13 +150,19 @@ describe("legacyMatch", () => {
   ]
 
   test("matches the id as a whole word", () => {
-    expect(legacyMatch(notes, "PROJ-1")?.basename).toBe("Bug - PROJ-1")
-    expect(legacyMatch(notes, "PROJ-12")?.basename).toBe("Bug - PROJ-12")
-    expect(legacyMatch(notes, "OJ-1")).toBeUndefined()
+    expect(legacyMatch(notes, "PROJ-1", "x")?.basename).toBe("Bug - PROJ-1")
+    expect(legacyMatch(notes, "PROJ-12", "x")?.basename).toBe("Bug - PROJ-12")
+    expect(legacyMatch(notes, "OJ-1", "x")).toBeUndefined()
+  })
+
+  test("bare numbers need the exact note name", () => {
+    const numbered = [{ path: "a/Meeting 3.md", basename: "Meeting 3" }, { path: "a/Card - 3.md", basename: "Card - 3" }]
+    expect(legacyMatch(numbered, "3", "Task - 3")).toBeUndefined()
+    expect(legacyMatch(numbered, "3", "Card - 3")?.basename).toBe("Card - 3")
   })
 
   test("ignores notes that already belong to a task", () => {
-    expect(legacyMatch([{ ...notes[1]!, id: "X", source: "s" }], "PROJ-1")).toBeUndefined()
+    expect(legacyMatch([{ ...notes[1]!, id: "X", source: "s" }], "PROJ-1", "Bug - PROJ-1")).toBeUndefined()
   })
 })
 
