@@ -19,6 +19,9 @@ export default class SyncTasksPlugin extends Plugin {
   runner!: SyncRunner
   private timers: number[] = []
   private sourceCommands: string[] = []
+  private statusEl!: HTMLElement
+  /** The latest result of each source, for the status bar tooltip. */
+  private lastResults = new Map<string, SyncResult>()
 
   override async onload() {
     await this.loadSettings()
@@ -28,6 +31,11 @@ export default class SyncTasksPlugin extends Plugin {
       context: (source) => fetchContext(this.app, source),
       settings: () => this.settings,
     })
+
+    this.statusEl = this.addStatusBarItem()
+    this.statusEl.addClass("mod-clickable")
+    this.registerDomEvent(this.statusEl, "click", () => void this.syncAll())
+    this.updateStatus()
 
     this.addSettingTab(new SyncTasksSettingTab(this.app, this))
     this.addRibbonIcon("refresh-cw", "Sync tasks from all sources", () => void this.syncAll())
@@ -98,13 +106,31 @@ export default class SyncTasksPlugin extends Plugin {
       if (!quiet) new Notice("Sync Tasks: no enabled source. Add one in the settings.")
       return []
     }
-    const results = await this.runner.run(sources)
+    let finished = 0
+    this.updateStatus(`syncing 0/${sources.length}`)
+    const results = await this.runner.run(sources, (result) => {
+      this.lastResults.set(result.source.id, result)
+      this.updateStatus(`syncing ${++finished}/${sources.length}`)
+    })
+    this.updateStatus()
     const failed = results.some((result) => result.error)
     for (const result of results) {
       if (result.error) console.error(`Sync Tasks: ${result.source.name}: ${result.error}`)
     }
     if (!quiet || failed) new Notice(`Sync Tasks\n${summary(results)}`, failed ? 10000 : 5000)
     return results
+  }
+
+  /** "Tasks: syncing 2/5", or the time of the last sync and whether anything failed. */
+  private updateStatus(progress?: string) {
+    const known = new Set(this.settings.sources.map((s) => s.id))
+    const results = [...this.lastResults.values()].filter((r) => known.has(r.source.id))
+    const failed = results.filter((r) => r.error).length
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    const text = progress ?? (results.length === 0 ? "idle" : failed ? `${failed} failed at ${time}` : `synced ${time}`)
+    this.statusEl.setText(`Tasks: ${text}`)
+    this.statusEl.setAttr("aria-label", results.length ? summary(results) : "Click to sync all sources")
+    this.statusEl.setAttr("data-tooltip-position", "top")
   }
 
   async loadSettings() {
