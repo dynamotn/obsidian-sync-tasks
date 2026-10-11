@@ -1,15 +1,15 @@
-import type { IndexedNote, NoteRef, NoteStore } from "../src/sync"
+import type { Frontmatter, IndexedNote, NoteRef, NoteStore } from "../src/sync"
 
 interface File {
   content: string
-  source?: string
-  id?: string
+  fm?: Frontmatter
 }
 
 /** An in-memory vault for exercising the sync engine. */
 export class MemoryStore implements NoteStore {
   files = new Map<string, File>()
   folders = new Set<string>()
+  /** Board writes and frontmatter changes, to check that unchanged data is not rewritten. */
   writes = 0
 
   private ref(path: string): NoteRef {
@@ -20,24 +20,29 @@ export class MemoryStore implements NoteStore {
     const prefix = folder ? `${folder}/` : ""
     return [...this.files.entries()]
       .filter(([path]) => path.startsWith(prefix) && path.endsWith(".md"))
-      .map(([path, file]) => ({ ...this.ref(path), source: file.source, id: file.id }))
+      .map(([path, file]) => ({
+        ...this.ref(path),
+        source: file.fm?.["task-source"] as string | undefined,
+        id: file.fm?.["task-id"] as string | undefined,
+      }))
   }
 
   async ensureFolder(path: string) {
     this.folders.add(path)
   }
 
-  async create(path: string, content: string, source: string, id: string) {
+  async create(path: string, content: string, fm: Frontmatter) {
     let free = path
     for (let n = 1; this.files.has(free); n++) free = path.replace(/\.md$/, ` ${n}.md`)
-    this.files.set(free, { content, source, id })
+    this.files.set(free, { content, fm: { ...fm } })
     return this.ref(free)
   }
 
-  async stamp(note: NoteRef, source: string, id: string) {
+  async stamp(note: NoteRef, fm: Frontmatter) {
     const file = this.files.get(note.path)!
-    file.source = source
-    file.id = id
+    if (Object.entries(fm).every(([k, v]) => file.fm?.[k] === v)) return
+    file.fm = { ...file.fm, ...fm }
+    this.writes++
   }
 
   async move(note: NoteRef, folder: string) {

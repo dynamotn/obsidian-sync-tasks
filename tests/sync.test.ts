@@ -17,7 +17,8 @@ function provider(groups: () => TaskGroup[] | Promise<TaskGroup[]>, id = "fake")
   return { id, name: "Fake", defaults: {}, fields: [], fetch: async () => groups() }
 }
 
-const settings = { ...DEFAULT_SETTINGS, noteTemplate: "# {{TASK_TITLE}}" }
+const settings = { ...DEFAULT_SETTINGS, noteTemplate: "# {{TASK_TITLE}}", frontmatter: false }
+const id = (source: string, task: string) => ({ "task-source": source, "task-id": task })
 
 describe("syncSource", () => {
   test("creates notes and a board in the group folder", async () => {
@@ -30,8 +31,7 @@ describe("syncSource", () => {
     expect(result).toMatchObject({ tasks: 1, created: 1, boards: 1 })
     expect(store.files.get("Work/sprint-1/Bug - PROJ-1.md")).toEqual({
       content: "# Fix the login page",
-      source: "s1",
-      id: "PROJ-1",
+      fm: id("s1", "PROJ-1"),
     })
     expect(store.files.get("Work/sprint-1/sprint-1-Board.md")?.content).toContain(
       "[[Work/sprint-1/Bug - PROJ-1|Bug - PROJ-1]]",
@@ -82,7 +82,7 @@ describe("syncSource", () => {
 
   test("leaves notes the user filed elsewhere where they are", async () => {
     const store = new MemoryStore()
-    store.files.set("Work/Archive/Bug - PROJ-1.md", { content: "", source: "s1", id: "PROJ-1" })
+    store.files.set("Work/Archive/Bug - PROJ-1.md", { content: "", fm: id("s1", "PROJ-1") })
     const source = newSource("s1", "fake", "Work", {})
     const p = provider(() => [{ folder: "", splitCompleted: true, tasks: [task({ done: true })] }])
 
@@ -98,7 +98,7 @@ describe("syncSource", () => {
     const result = await syncSource(source, p, ctx, store, settings)
 
     expect(result.created).toBe(0)
-    expect(store.files.get("Work/sprint-1/Bug - PROJ-1.md")).toEqual({ content: "mine", source: "s1", id: "PROJ-1" })
+    expect(store.files.get("Work/sprint-1/Bug - PROJ-1.md")).toEqual({ content: "mine", fm: id("s1", "PROJ-1") })
   })
 
   test("does not rewrite an unchanged board", async () => {
@@ -108,6 +108,31 @@ describe("syncSource", () => {
     await syncSource(source, p, ctx, store, settings)
     expect((await syncSource(source, p, ctx, store, settings)).boards).toBe(0)
     expect(store.writes).toBe(1)
+  })
+
+  test("keeps task details in frontmatter up to date, writing only on change", async () => {
+    const store = new MemoryStore()
+    const source = newSource("s1", "fake", "Work", {})
+    let state = "To Do"
+    const p = provider(() => [{ folder: "", tasks: [task({ state, due: "2026-10-20" })] }])
+    const withFm = { ...settings, frontmatter: true }
+
+    await syncSource(source, p, ctx, store, withFm)
+    expect(store.files.get("Work/Bug - PROJ-1.md")?.fm).toEqual({
+      ...id("s1", "PROJ-1"),
+      "task-title": "Fix the login page",
+      "task-state": "To Do",
+      "task-assignee": "Ann",
+      "task-url": "https://example.com/PROJ-1",
+      "task-due": "2026-10-20",
+      "task-done": false,
+    })
+    await syncSource(source, p, ctx, store, withFm)
+    expect(store.writes).toBe(0)
+    state = "Done"
+    await syncSource(source, p, ctx, store, withFm)
+    expect(store.writes).toBe(1)
+    expect(store.files.get("Work/Bug - PROJ-1.md")?.fm?.["task-state"]).toBe("Done")
   })
 
   test("uses the source's own templates over the global ones", async () => {

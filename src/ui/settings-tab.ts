@@ -38,6 +38,15 @@ export class SyncTasksSettingTab extends PluginSettingTab {
       }),
     )
     new Setting(el)
+      .setName("Task details in frontmatter")
+      .setDesc("Keep task-state, task-assignee, task-due, task-url and task-done up to date in each note's properties, for Dataview or Bases.")
+      .addToggle((t) =>
+        t.setValue(settings.frontmatter).onChange(async (v) => {
+          settings.frontmatter = v
+          await this.save()
+        }),
+      )
+    new Setting(el)
       .setName("Sync interval")
       .setDesc("Minutes between automatic syncs of every source. 0 syncs only on demand. A source can override it.")
       .addText((t) =>

@@ -1,9 +1,5 @@
 import { normalizePath, TFile, TFolder, Vault, type App } from "obsidian"
-import type { IndexedNote, NoteRef, NoteStore } from "./sync"
-
-/** Frontmatter keys that tie a note to its task. */
-export const SOURCE_KEY = "task-source"
-export const ID_KEY = "task-id"
+import { ID_KEY, SOURCE_KEY, type Frontmatter, type IndexedNote, type NoteRef, type NoteStore } from "./sync"
 
 /** The sync engine's view of the vault. */
 export class VaultStore implements NoteStore {
@@ -44,17 +40,18 @@ export class VaultStore implements NoteStore {
     }
   }
 
-  async create(path: string, content: string, source: string, id: string): Promise<NoteRef> {
+  async create(path: string, content: string, frontmatter: Frontmatter): Promise<NoteRef> {
     const file = await this.app.vault.create(this.freePath(normalizePath(path)), content)
-    await this.stamp(file, source, id)
+    await this.app.fileManager.processFrontMatter(file, (fm) => Object.assign(fm, frontmatter))
     return file
   }
 
-  async stamp(note: NoteRef, source: string, id: string): Promise<void> {
-    await this.app.fileManager.processFrontMatter(this.file(note), (fm) => {
-      fm[SOURCE_KEY] = source
-      fm[ID_KEY] = id
-    })
+  async stamp(note: NoteRef, frontmatter: Frontmatter): Promise<void> {
+    const file = this.file(note)
+    const current = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}
+    // YAML may read "12" back as a number, so compare as text.
+    if (Object.entries(frontmatter).every(([key, value]) => String(current[key]) === String(value))) return
+    await this.app.fileManager.processFrontMatter(file, (fm) => Object.assign(fm, frontmatter))
   }
 
   async move(note: NoteRef, folder: string): Promise<NoteRef> {

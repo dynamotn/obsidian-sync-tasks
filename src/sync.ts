@@ -2,6 +2,7 @@ import { boardMarkdown, type BoardCard } from "./kanban"
 import type { FetchContext, Provider } from "./providers/provider"
 import type { Settings, SourceConfig } from "./settings"
 import { noteContent, noteName } from "./template"
+import type { Task } from "./types"
 import { joinPath, safeFileName } from "./util"
 
 /** A markdown file in the vault. */
@@ -16,15 +17,33 @@ export interface IndexedNote extends NoteRef {
   id?: string
 }
 
+/** Frontmatter keys that tie a note to its task. */
+export const SOURCE_KEY = "task-source"
+export const ID_KEY = "task-id"
+
+export type Frontmatter = Record<string, string | boolean>
+
+/** The task's current details, kept in its note's frontmatter when enabled. */
+export function taskFrontmatter(task: Task): Frontmatter {
+  return {
+    "task-title": task.title,
+    "task-state": task.state,
+    "task-assignee": task.assignee,
+    "task-url": task.url,
+    "task-due": task.due,
+    "task-done": task.done,
+  }
+}
+
 /** Everything the engine needs from the vault, so it can run against a fake one in tests. */
 export interface NoteStore {
   /** Markdown notes under a folder, recursively. */
   list(folder: string): Promise<IndexedNote[]>
   ensureFolder(path: string): Promise<void>
-  /** Creates a note, picking a free name if the path is taken; stamps the task identity. */
-  create(path: string, content: string, source: string, id: string): Promise<NoteRef>
-  /** Stamps the task identity into an existing note found by its name. */
-  stamp(note: NoteRef, source: string, id: string): Promise<void>
+  /** Creates a note, picking a free name if the path is taken, with these frontmatter keys set. */
+  create(path: string, content: string, frontmatter: Frontmatter): Promise<NoteRef>
+  /** Sets frontmatter keys of a note, without writing when they already hold those values. */
+  stamp(note: NoteRef, frontmatter: Frontmatter): Promise<void>
   move(note: NoteRef, folder: string): Promise<NoteRef>
   /** Writes a file unless it already has that content; returns whether it wrote. */
   write(path: string, content: string): Promise<boolean>
@@ -81,12 +100,16 @@ export async function syncSource(
     for (const task of group.tasks) {
       result.tasks++
       const target = joinPath(groupFolder, task.folder ?? "", group.splitCompleted && task.done ? COMPLETED : "")
+      const identity: Frontmatter = { [SOURCE_KEY]: source.id, [ID_KEY]: task.id }
+      const frontmatter = settings.frontmatter ? { ...identity, ...taskFrontmatter(task) } : identity
       let note = byId.get(task.id)
 
-      if (!note) {
+      if (note) {
+        if (settings.frontmatter) await store.stamp(note, frontmatter)
+      } else {
         const legacy = legacyMatch(unstamped, task.id)
         if (legacy) {
-          await store.stamp(legacy, source.id, task.id)
+          await store.stamp(legacy, frontmatter)
           unstamped.splice(unstamped.indexOf(legacy), 1)
           note = legacy
         }
@@ -96,7 +119,7 @@ export async function syncSource(
         await store.ensureFolder(target)
         const name = noteName(source.noteName || settings.noteName, task, meta)
         const content = noteContent(source.noteTemplate || settings.noteTemplate, task, meta)
-        note = await store.create(joinPath(target, `${name}.md`), content, source.id, task.id)
+        note = await store.create(joinPath(target, `${name}.md`), content, frontmatter)
         result.created++
       } else if (group.splitCompleted) {
         // Only move notes that sit where the plugin put them; leave hand-filed ones alone.

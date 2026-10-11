@@ -27,6 +27,8 @@ export interface Settings {
   /** Minutes between automatic syncs of every source; 0 syncs only on demand. */
   intervalMinutes: number
   syncOnStartup: boolean
+  /** Keep the task's state, assignee, due date and link in its note's frontmatter. */
+  frontmatter: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   noteTemplate: DEFAULT_NOTE_TEMPLATE,
   intervalMinutes: 0,
   syncOnStartup: false,
+  frontmatter: true,
 }
 
 export function newSource(id: string, provider: string, name: string, defaults: Options): SourceConfig {
