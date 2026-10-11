@@ -87,3 +87,37 @@ describe("gitlab", () => {
     })
   })
 })
+
+describe("gitlab user mode", () => {
+  test("assigned issues of every project, in date folders, ids prefixed by project", async () => {
+    const { ctx, requests } = fakeContext([
+      [
+        /\/api\/v4\/issues\?/,
+        [
+          issue(3, { references: { full: "acme/web#3" }, created_at: "2026-02-03T00:00:00Z", labels: ["Doing"] }),
+          issue(3, { id: 2003, references: { full: "acme/api#3" }, created_at: "2025-12-31T00:00:00Z" }),
+        ],
+      ],
+    ])
+
+    const [group] = await gitlab.fetch(
+      { ...options, mode: "user", projectId: "", boardId: "9", excludeClosed: true, columns: "Open,Doing,Closed" },
+      ctx,
+    )
+
+    expect(requests.map((r) => r.url)).toEqual([
+      "https://gitlab.com/api/v4/issues?state=opened&scope=assigned_to_me&per_page=100&page=1",
+    ])
+    expect(group!.board).toEqual({ name: "all-issues", columns: ["Open", "Doing", "Closed"] })
+    expect(group!.tasks.map((t) => [t.id, t.folder, t.state])).toEqual([
+      ["web-3", "2026/Q1/February", "Doing"],
+      ["api-3", "2025/Q4/December", "Open"],
+    ])
+  })
+
+  test("listed assignees search every project", async () => {
+    const { ctx, requests } = fakeContext([[/issues/, []]])
+    await gitlab.fetch({ ...options, mode: "user", usernames: "ann" }, ctx)
+    expect(requests[0]!.url).toBe("https://gitlab.com/api/v4/issues?state=all&scope=all&assignee_username=ann&per_page=100&page=1")
+  })
+})

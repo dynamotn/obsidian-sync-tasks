@@ -1,6 +1,6 @@
 import type { Task, TaskGroup } from "../types"
-import { isoDate, slug, splitList, uniqueBy } from "../util"
-import { baseUrl, str, type FetchContext, type Options, type Provider } from "./provider"
+import { dateFolder, isoDate, slug, splitList, uniqueBy } from "../util"
+import { baseUrl, bool, str, type FetchContext, type Options, type Provider } from "./provider"
 
 const PAGE = 100
 
@@ -78,6 +78,12 @@ export function issueToTask(issue: any, columns: Columns, id: string = String(is
   }
 }
 
+/** Issue numbers repeat across projects, so user mode prefixes the project: "web-12". */
+export function userModeId(issue: any): string {
+  const project = String(issue.references?.full ?? "").split("#")[0]?.split("/").pop()
+  return project ? `${project}-${issue.iid}` : String(issue.id)
+}
+
 export const gitlab: Provider = {
   id: "gitlab",
   name: "GitLab",
@@ -90,6 +96,7 @@ export const gitlab: Provider = {
     usernames: "",
     useMilestoneName: true,
     columns: "Open,Closed",
+    excludeClosed: false,
   },
   fields: [
     { key: "url", name: "Instance", type: "text", placeholder: "gitlab.com" },
@@ -101,6 +108,7 @@ export const gitlab: Provider = {
       choices: {
         milestones: "Milestones: the active milestone of a project",
         board: "Board: every issue of a project",
+        user: "User: assigned issues of every project, in Year/Quarter/Month folders",
       },
     },
     {
@@ -108,19 +116,27 @@ export const gitlab: Provider = {
       name: "Project",
       desc: "Numeric project ID or full path, e.g. 12345 or group/project.",
       type: "text",
+      when: (o) => o.mode !== "user",
     },
     {
       key: "boardId",
       name: "Board ID",
       desc: "Optional. When set, columns come from the board's label lists.",
       type: "text",
+      when: (o) => o.mode !== "user",
     },
     {
       key: "columns",
       name: "Board columns",
       desc: 'Used without a board ID. Include "Open" and "Closed"; the others are labels.',
       type: "text",
-      when: (o) => !str(o, "boardId"),
+      when: (o) => o.mode === "user" || !str(o, "boardId"),
+    },
+    {
+      key: "excludeClosed",
+      name: "Exclude closed issues",
+      type: "toggle",
+      when: (o) => o.mode === "user",
     },
     {
       key: "useMilestoneName",
@@ -140,6 +156,20 @@ export const gitlab: Provider = {
   async fetch(options, ctx) {
     const headers = { "PRIVATE-TOKEN": ctx.secret(str(options, "token")) }
     const root = `${baseUrl(str(options, "url"), "gitlab.com")}/api/v4`
+
+    if (options.mode === "user") {
+      const state = bool(options, "excludeClosed") ? "opened" : "all"
+      // The global endpoint defaults to issues created by the token owner; widen it unless asking for "assigned to me".
+      const mine = !ctx.teamMode && splitList(str(options, "usernames")).length === 0
+      const issues = await issuesFor(ctx, `${root}/issues?state=${state}${mine ? "" : "&scope=all"}`, options, headers)
+      const columns = await columnsFor(ctx, root, options, headers)
+      const tasks = issues.map((issue) => ({
+        ...issueToTask(issue, columns, userModeId(issue)),
+        folder: dateFolder(issue.created_at),
+      }))
+      return [{ folder: "", board: { name: "all-issues", columns: columns.names }, tasks }]
+    }
+
     const projectId = str(options, "projectId")
     if (!projectId) throw new Error("no project is set")
     const api = `${root}/projects/${encodeURIComponent(projectId)}`
