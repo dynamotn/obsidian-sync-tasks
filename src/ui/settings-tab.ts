@@ -47,6 +47,18 @@ export class SyncTasksSettingTab extends PluginSettingTab {
         }),
       )
     new Setting(el)
+      .setName("Overview note")
+      .setDesc("Path of a note listing the open tasks of every source, e.g. Tasks/Overview.md. Empty for none.")
+      .addText((t) =>
+        t
+          .setPlaceholder("Tasks/Overview.md")
+          .setValue(settings.overviewNote)
+          .onChange(async (v) => {
+            settings.overviewNote = v.trim()
+            await this.save()
+          }),
+      )
+    new Setting(el)
       .setName("Sync interval")
       .setDesc("Minutes between automatic syncs of every source. 0 syncs only on demand. A source can override it.")
       .addText((t) =>

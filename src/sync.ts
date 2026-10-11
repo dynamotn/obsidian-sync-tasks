@@ -55,6 +55,8 @@ export interface SyncResult {
   created: number
   moved: number
   boards: number
+  /** Every task with the note it links to, for the overview. */
+  cards: BoardCard[]
   error?: string
 }
 
@@ -83,7 +85,7 @@ export async function syncSource(
   store: NoteStore,
   settings: Settings,
 ): Promise<SyncResult> {
-  const result: SyncResult = { source, tasks: 0, created: 0, moved: 0, boards: 0 }
+  const result: SyncResult = { source, tasks: 0, created: 0, moved: 0, boards: 0, cards: [] }
   const groups = await provider.fetch(source.options, ctx)
   const root = joinPath(source.folder)
   const meta = { name: source.name, provider: source.provider }
@@ -136,6 +138,7 @@ export async function syncSource(
       cards.push({ task, link: linkTo(note) })
     }
 
+    result.cards.push(...cards)
     if (source.createBoard && group.board) {
       await store.ensureFolder(groupFolder)
       const path = joinPath(groupFolder, `${safeFileName(group.board.name)}-Board.md`)
@@ -185,7 +188,15 @@ export class SyncRunner {
             this.engine.settings(),
           )
         } catch (e) {
-          result = { source, tasks: 0, created: 0, moved: 0, boards: 0, error: e instanceof Error ? e.message : String(e) }
+          result = {
+            source,
+            tasks: 0,
+            created: 0,
+            moved: 0,
+            boards: 0,
+            cards: [],
+            error: e instanceof Error ? e.message : String(e),
+          }
         } finally {
           this.running.delete(source.id)
         }

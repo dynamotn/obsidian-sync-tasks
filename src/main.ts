@@ -9,6 +9,7 @@
 import { Notice, Plugin } from "obsidian"
 import { fetchContext } from "./http"
 import { providerMap } from "./providers"
+import { overviewMarkdown } from "./overview"
 import { normalizeSettings, schedule, type Settings, type SourceConfig } from "./settings"
 import { summary, SyncRunner, type SyncResult } from "./sync"
 import { SyncTasksSettingTab } from "./ui/settings-tab"
@@ -19,15 +20,17 @@ export default class SyncTasksPlugin extends Plugin {
   runner!: SyncRunner
   private timers: number[] = []
   private sourceCommands: string[] = []
+  private store!: VaultStore
   private statusEl!: HTMLElement
   /** The latest result of each source, for the status bar tooltip. */
   private lastResults = new Map<string, SyncResult>()
 
   override async onload() {
     await this.loadSettings()
+    this.store = new VaultStore(this.app)
     this.runner = new SyncRunner({
       providers: providerMap,
-      store: new VaultStore(this.app),
+      store: this.store,
       context: (source) => fetchContext(this.app, source),
       settings: () => this.settings,
     })
@@ -113,12 +116,27 @@ export default class SyncTasksPlugin extends Plugin {
       this.updateStatus(`syncing ${++finished}/${sources.length}`)
     })
     this.updateStatus()
+    await this.writeOverview()
     const failed = results.some((result) => result.error)
     for (const result of results) {
       if (result.error) console.error(`Sync Tasks: ${result.source.name}: ${result.error}`)
     }
     if (!quiet || failed) new Notice(`Sync Tasks\n${summary(results)}`, failed ? 10000 : 5000)
     return results
+  }
+
+  /** Rewrites the overview note from the latest result of each source, in settings order. */
+  private async writeOverview() {
+    const path = this.settings.overviewNote
+    if (!path) return
+    const results = this.settings.sources.flatMap((s) => this.lastResults.get(s.id) ?? [])
+    const file = path.endsWith(".md") ? path : `${path}.md`
+    try {
+      if (file.includes("/")) await this.store.ensureFolder(file.slice(0, file.lastIndexOf("/")))
+      await this.store.write(file, overviewMarkdown(results))
+    } catch (e) {
+      console.error("Sync Tasks: could not write the overview note", e)
+    }
   }
 
   /** "Tasks: syncing 2/5", or the time of the last sync and whether anything failed. */

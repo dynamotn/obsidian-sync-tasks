@@ -29,6 +29,8 @@ export interface Settings {
   syncOnStartup: boolean
   /** Keep the task's state, assignee, due date and link in its note's frontmatter. */
   frontmatter: boolean
+  /** Path of a note listing the open tasks of every source; "" for none. */
+  overviewNote: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   intervalMinutes: 0,
   syncOnStartup: false,
   frontmatter: true,
+  overviewNote: "",
 }
 
 export function newSource(id: string, provider: string, name: string, defaults: Options): SourceConfig {
