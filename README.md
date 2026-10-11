@@ -18,6 +18,7 @@ folder. They all sync together.
 | **Linear** | Your issues, or a team's, optionally the active cycle only |
 | **Todoist** | The active tasks of a project (a column per section) or of a filter |
 | **Trello** | Your cards on a board, or every card |
+| **ClickUp** | The tasks of a list (or sprint), or across a workspace |
 
 ## Use
 
@@ -30,7 +31,8 @@ folder. They all sync together.
 
 Each sync creates notes for new tasks, from your template, and leaves existing
 notes alone: what you write in them is never overwritten. In modes that split
-finished tasks off (Jira Kanban, GitLab Board, GitHub, Linear, Todoist), notes
+finished tasks off (Jira Kanban, GitLab Board, GitHub, Linear, Todoist,
+ClickUp), notes
 move in and out of a `Completed` folder as tasks close and reopen; notes you
 filed elsewhere stay where you put them.
 
@@ -51,10 +53,11 @@ Globally:
   `{{TASK_TYPE}}`, `{{TASK_STATE}}`, `{{TASK_ASSIGNEDTO}}`, `{{TASK_LINK}}`,
   `{{TASK_DESCRIPTION}}`, `{{TASK_DUEDATE}}`, `{{TASK_CREATED}}`,
   `{{TASK_TAGS}}`, `{{SOURCE_NAME}}`, `{{SOURCE_TYPE}}`, and per tracker:
-  `{{TASK_PRIORITY}}` (Jira, Azure DevOps, Linear, Todoist),
+  `{{TASK_PRIORITY}}` (Jira, Azure DevOps, Linear, Todoist, ClickUp),
   `{{TASK_CRITERIA}}` and `{{TASK_TESTS}}` (Azure DevOps), `{{TASK_MILESTONE}}`
   (GitLab, GitHub), `{{TASK_REPO}}` (GitHub), `{{TASK_PROJECT}}` (Linear,
-  Todoist), `{{TASK_TEAM}}` (Linear), `{{TASK_DEADLINE}}` (Todoist).
+  Todoist), `{{TASK_TEAM}}` (Linear), `{{TASK_DEADLINE}}` (Todoist),
+  `{{TASK_LIST}}` (ClickUp).
 - **Task details in frontmatter**: keeps `task-state`, `task-assignee`,
   `task-due`, `task-url`, `task-title` and `task-done` current in each note's
   properties, for Dataview or Bases.
