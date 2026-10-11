@@ -1,0 +1,20 @@
+{
+  "name": "obsidian-sync-tasks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sync tasks from many task trackers at once into Obsidian notes and Kanban boards",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --format=cjs --platform=browser --target=es2022 --external:obsidian --outfile=main.js",
+    "dev": "bun run build --watch --sourcemap=inline",
+    "check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "typescript": "6"
+  }
+}

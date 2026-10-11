@@ -1,0 +1,9 @@
+{
+  "id": "sync-tasks",
+  "name": "Sync Tasks",
+  "version": "0.1.0",
+  "minAppVersion": "1.11.4",
+  "description": "Sync tasks from many task trackers at once (Jira, Azure DevOps, GitLab, GitHub, Linear, Todoist, Trello) into notes and Kanban boards.",
+  "author": "Trần Đức Nam",
+  "isDesktopOnly": false
+}
