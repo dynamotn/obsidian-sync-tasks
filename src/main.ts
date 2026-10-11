@@ -9,7 +9,7 @@
 import { Notice, Plugin } from "obsidian"
 import { fetchContext } from "./http"
 import { providerMap } from "./providers"
-import { normalizeSettings, type Settings, type SourceConfig } from "./settings"
+import { normalizeSettings, schedule, type Settings, type SourceConfig } from "./settings"
 import { summary, SyncRunner, type SyncResult } from "./sync"
 import { SyncTasksSettingTab } from "./ui/settings-tab"
 import { VaultStore } from "./vault"
@@ -17,6 +17,8 @@ import { VaultStore } from "./vault"
 export default class SyncTasksPlugin extends Plugin {
   declare settings: Settings
   runner!: SyncRunner
+  private timers: number[] = []
+  private sourceCommands: string[] = []
 
   override async onload() {
     await this.loadSettings()
@@ -38,6 +40,49 @@ export default class SyncTasksPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (this.settings.syncOnStartup) void this.syncAll(true)
     })
+    this.applySettings()
+  }
+
+  override onunload() {
+    this.clearTimers()
+  }
+
+  /** Re-arms the timers and the per-source commands after any settings change. */
+  private applySettings() {
+    this.clearTimers()
+    for (const [minutes, ids] of schedule(this.settings)) {
+      const timer = window.setInterval(() => {
+        void this.sync(
+          this.settings.sources.filter((source) => ids.includes(source.id)),
+          true,
+        )
+      }, minutes * 60_000)
+      this.timers.push(timer)
+      this.registerInterval(timer)
+    }
+
+    for (const id of this.sourceCommands) this.removeCommand(id)
+    this.sourceCommands = []
+    for (const source of this.settings.sources) {
+      // removeCommand takes the id without the plugin prefix that addCommand adds.
+      const id = `sync-source-${source.id}`
+      this.addCommand({
+        id,
+        name: `Sync ${source.name || source.provider}`,
+        checkCallback: (checking) => {
+          const current = this.settings.sources.find((s) => s.id === source.id)
+          if (!current?.enabled) return false
+          if (!checking) void this.sync([current])
+          return true
+        },
+      })
+      this.sourceCommands.push(id)
+    }
+  }
+
+  private clearTimers() {
+    for (const timer of this.timers) window.clearInterval(timer)
+    this.timers = []
   }
 
   /** Syncs every enabled source; quiet runs only speak up on failure. */
@@ -68,5 +113,6 @@ export default class SyncTasksPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings)
+    this.applySettings()
   }
 }

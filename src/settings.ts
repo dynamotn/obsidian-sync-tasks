@@ -69,3 +69,14 @@ export function effectiveInterval(source: SourceConfig, settings: Settings): num
   const minutes = source.intervalMinutes ?? settings.intervalMinutes
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 0
 }
+
+/** Enabled sources grouped by interval, so sources on the same beat sync together. */
+export function schedule(settings: Settings): Map<number, string[]> {
+  const groups = new Map<number, string[]>()
+  for (const source of settings.sources) {
+    const minutes = effectiveInterval(source, settings)
+    if (!source.enabled || minutes === 0) continue
+    groups.set(minutes, [...(groups.get(minutes) ?? []), source.id])
+  }
+  return groups
+}

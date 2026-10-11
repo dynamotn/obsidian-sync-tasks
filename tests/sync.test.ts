@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { FetchContext, Provider } from "../src/providers/provider"
-import { DEFAULT_SETTINGS, newSource, normalizeSettings, effectiveInterval } from "../src/settings"
+import { DEFAULT_SETTINGS, newSource, normalizeSettings, effectiveInterval, schedule } from "../src/settings"
 import { legacyMatch, summary, syncSource, SyncRunner } from "../src/sync"
 import type { TaskGroup } from "../src/types"
 import { task } from "./helpers"
@@ -208,5 +208,25 @@ describe("settings", () => {
     expect(effectiveInterval(source, s)).toBe(30)
     expect(effectiveInterval({ ...source, intervalMinutes: 0 }, s)).toBe(0)
     expect(effectiveInterval({ ...source, intervalMinutes: 5 }, s)).toBe(5)
+  })
+})
+
+describe("schedule", () => {
+  test("groups enabled sources by interval", () => {
+    const s = {
+      ...DEFAULT_SETTINGS,
+      intervalMinutes: 30,
+      sources: [
+        newSource("a", "jira", "A", {}),
+        { ...newSource("b", "jira", "B", {}), intervalMinutes: 5 },
+        newSource("c", "jira", "C", {}),
+        { ...newSource("d", "jira", "D", {}), enabled: false },
+        { ...newSource("e", "jira", "E", {}), intervalMinutes: 0 },
+      ],
+    }
+    expect([...schedule(s)]).toEqual([
+      [30, ["a", "c"]],
+      [5, ["b"]],
+    ])
   })
 })
