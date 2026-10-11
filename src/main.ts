@@ -48,10 +48,30 @@ export default class SyncTasksPlugin extends Plugin {
       callback: () => void this.syncAll(),
     })
 
-    this.app.workspace.onLayoutReady(() => {
-      if (this.settings.syncOnStartup) void this.syncAll(true)
+    this.app.workspace.onLayoutReady(async () => {
+      if (!this.settings.syncOnStartup) return
+      await this.metadataSettled()
+      void this.syncAll(true)
     })
     this.applySettings()
+  }
+
+  /**
+   * Notes are found by their frontmatter, so a sync right after startup waits
+   * for the metadata cache to finish indexing (or a few seconds at most, as
+   * an already finished index does not announce itself again).
+   */
+  private metadataSettled(): Promise<void> {
+    return new Promise((resolve) => {
+      const ref = this.app.metadataCache.on("resolved", done)
+      const timer = window.setTimeout(done, 5000)
+      const cache = this.app.metadataCache
+      function done() {
+        cache.offref(ref)
+        window.clearTimeout(timer)
+        resolve()
+      }
+    })
   }
 
   override onunload() {
