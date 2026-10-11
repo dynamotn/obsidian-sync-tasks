@@ -1,4 +1,5 @@
-import { PluginSettingTab, SecretComponent, Setting, type App } from "obsidian"
+import { normalizePath, Notice, PluginSettingTab, SecretComponent, Setting, type App } from "obsidian"
+import { fromAgileTaskNotes, LEGACY_DATA } from "../legacy"
 import type SyncTasksPlugin from "../main"
 import { PROVIDERS, providerMap } from "../providers"
 import type { Field, Options } from "../providers/provider"
@@ -118,7 +119,39 @@ export class SyncTasksSettingTab extends PluginSettingTab {
           }),
       )
 
+    new Setting(el)
+      .setName("Import from Agile Task Notes")
+      .setDesc("Add sources from that plugin's settings. Its tokens move into Obsidian's keychain, and its notes are picked up by name.")
+      .addButton((b) => b.setButtonText("Import").onClick(() => void this.importLegacy()))
+
     for (const source of this.plugin.settings.sources) this.source(el, source)
+  }
+
+  private async importLegacy() {
+    const path = normalizePath(`${this.app.vault.configDir}/${LEGACY_DATA}`)
+    if (!(await this.app.vault.adapter.exists(path))) {
+      new Notice("Sync Tasks: no Agile Task Notes settings found in this vault.")
+      return
+    }
+    let imported
+    try {
+      imported = fromAgileTaskNotes(JSON.parse(await this.app.vault.adapter.read(path)), newId)
+    } catch (e) {
+      new Notice(`Sync Tasks: could not read Agile Task Notes settings: ${e instanceof Error ? e.message : e}`)
+      return
+    }
+    for (const { name, value } of imported.secrets) this.app.secretStorage.setSecret(name, value)
+    for (const source of imported.sources) {
+      this.plugin.settings.sources.push(source)
+      this.open.add(source.id)
+    }
+    await this.save()
+    this.display()
+    new Notice(
+      `Sync Tasks: imported ${imported.sources.length} source(s).` +
+        (imported.secrets.length ? " Their tokens are in Obsidian's keychain now; the old plugin's data.json still holds them in plain text." : ""),
+      10000,
+    )
   }
 
   private source(el: HTMLElement, source: SourceConfig) {
