@@ -11,6 +11,7 @@ import { fetchContext } from "./http"
 import { providerMap } from "./providers"
 import { normalizeSettings, type Settings, type SourceConfig } from "./settings"
 import { summary, SyncRunner, type SyncResult } from "./sync"
+import { SyncTasksSettingTab } from "./ui/settings-tab"
 import { VaultStore } from "./vault"
 
 export default class SyncTasksPlugin extends Plugin {
@@ -26,6 +27,7 @@ export default class SyncTasksPlugin extends Plugin {
       settings: () => this.settings,
     })
 
+    this.addSettingTab(new SyncTasksSettingTab(this.app, this))
     this.addRibbonIcon("refresh-cw", "Sync tasks from all sources", () => void this.syncAll())
     this.addCommand({
       id: "sync-all",

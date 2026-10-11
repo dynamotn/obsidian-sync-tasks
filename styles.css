@@ -1,0 +1,22 @@
+/* One collapsible block per source in the settings tab. */
+.sync-tasks-source {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
+  margin-bottom: var(--size-4-2);
+}
+
+.sync-tasks-source > summary {
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+}
+
+.sync-tasks-source > summary.is-disabled {
+  color: var(--text-faint);
+}
+
+.sync-tasks-wide {
+  width: 100%;
+  min-width: 18em;
+  font-family: var(--font-monospace);
+}
