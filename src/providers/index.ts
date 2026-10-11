@@ -4,8 +4,9 @@ import { gitlab } from "./gitlab"
 import { jira } from "./jira"
 import { linear } from "./linear"
 import type { Provider } from "./provider"
+import { todoist } from "./todoist"
 
 /** Every tracker the plugin can sync from, in the order shown when adding a source. */
-export const PROVIDERS: Provider[] = [jira, azureDevops, gitlab, github, linear]
+export const PROVIDERS: Provider[] = [jira, azureDevops, gitlab, github, linear, todoist]
 
 export const providerMap = new Map(PROVIDERS.map((provider) => [provider.id, provider]))
